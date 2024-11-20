@@ -1,0 +1,14 @@
+LICENSE
+README.md
+setup.py
+sphericaltokenizer/__init__.py
+sphericaltokenizer/layers.py
+sphericaltokenizer/momentum.py
+sphericaltokenizer/spheroid.py
+sphericaltokenizer/tokenizer.py
+sphericaltokenizer.egg-info/PKG-INFO
+sphericaltokenizer.egg-info/SOURCES.txt
+sphericaltokenizer.egg-info/dependency_links.txt
+sphericaltokenizer.egg-info/requires.txt
+sphericaltokenizer.egg-info/top_level.txt
+tests/test_sphericaltokenizer.py
