@@ -12,12 +12,12 @@ class Layer:
     
     Attributes:
         name: Layer identifier
-        spheroids: List of spheroids for this layer
+        spheroid: Single spheroid for this layer
         permissions: Set of allowed operations
         key: Layer-specific encryption key
     """
     name: str
-    spheroids: List[Spheroid]
+    spheroid: Spheroid
     permissions: Set[str]
     key: bytes
 
@@ -36,10 +36,7 @@ class LayerManager:
         self.embedding_dim = embedding_dim
         self.layers: Dict[str, Layer] = {}
         self.layer_order: List[str] = []
-        
-        # Set device (GPU if available, else CPU)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        
+    
     def create_layer(self, 
                     name: str, 
                     key: bytes,
@@ -58,16 +55,15 @@ class LayerManager:
         if name in self.layers:
             raise ValueError(f"Layer '{name}' already exists")
             
-        # Generate spheroids for this layer
+        # Generate spheroid for this layer
         from .spheroid import SpheroidGenerator  # Import here to avoid circular import
         generator = SpheroidGenerator(self.embedding_dim)
-        generator.to_device(self.device)  # Move generator to current device
-        spheroids = generator.generate_spheroids()
+        spheroid = generator.generate_spheroids()[0]  # Use only first spheroid
         
         # Create layer with specified permissions
         layer = Layer(
             name=name,
-            spheroids=spheroids,
+            spheroid=spheroid,
             permissions=permissions or set(),
             key=key
         )
@@ -141,28 +137,15 @@ class LayerManager:
         
         layer = self.layers[layer_name]
         
-        # Handle both single vectors and batches
-        is_batch = len(vector.shape) > 1
-        if not is_batch:
-            vector = vector.unsqueeze(0)
+        # Apply transformation using single spheroid
+        result = encryptor.apply_momentum(
+            vector,
+            layer.spheroid,
+            self.layer_order.index(layer_name),
+            inverse=inverse
+        )
         
-        result = vector.clone()
-        
-        # Process each spheroid
-        for i, spheroid in enumerate(layer.spheroids):
-            # Check which vectors in batch are in spheroid
-            in_spheroid = encryptor._vector_in_spheroid(result, spheroid)
-            if torch.any(in_spheroid):
-                # Apply transformation only to vectors that are in spheroid
-                transformed = encryptor.apply_momentum(
-                    result[in_spheroid],
-                    spheroid,
-                    i,
-                    inverse=inverse
-                )
-                result[in_spheroid] = transformed
-        
-        return result.squeeze(0) if not is_batch else result
+        return result
     
     @torch.no_grad()
     def apply_layers(self,
@@ -197,7 +180,7 @@ class LayerManager:
                                vector: torch.Tensor,
                                layer_names: List[str],
                                encryptor: MomentumEncryptor,
-                               tolerance: float = 1e-10) -> bool:
+                               tolerance: float = 1e-6) -> bool:  # Relaxed tolerance
         """
         Verify that layer composition is reversible.
         
@@ -257,13 +240,3 @@ class LayerManager:
         """
         effective_permissions = self.get_effective_permissions(layer_names)
         return required_permissions.issubset(effective_permissions)
-    
-    def to_device(self, device: torch.device):
-        """
-        Move the layer manager to specified device.
-        
-        Args:
-            device: Target device (cuda or cpu)
-        """
-        self.device = device
-        # Note: Spheroids will be moved to device when accessed

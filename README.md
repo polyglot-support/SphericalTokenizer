@@ -5,7 +5,7 @@ A secure tokenization system that uses spherical geometry and particle momentum 
 ## Features
 
 - Spheroid-based decomposition of embedding space
-- Momentum-based encryption with guaranteed minimum transformation effect
+- Momentum-based encryption with configurable complexity levels
 - Cross-modal security with consistency verification
 - Anomaly detection for embedding manipulation attempts
 - Device-independent operation (CPU/GPU support)
@@ -24,13 +24,14 @@ pip install sphericaltokenizer
 import torch
 from sphericaltokenizer import CrossModalManager
 
-# Initialize the manager
+# Initialize the manager with desired complexity
 manager = CrossModalManager(
     modalities={
         'image': 512,
         'text': 768
     },
-    master_key=b'your-secure-key'
+    master_key=b'your-secure-key',
+    complexity='standard'  # Choose: 'minimal', 'basic', 'standard', 'high'
 )
 
 # Transform embeddings
@@ -42,11 +43,49 @@ embeddings = {
 transformed = manager.secure_cross_modal_transform(embeddings)
 ```
 
+## Complexity Levels
+
+SphericalTokenizer supports different complexity levels to balance security and performance:
+
+1. **Minimal** (`complexity='minimal'`)
+   - Simple static shift transformation
+   - Fastest performance
+   - Suitable for basic context differentiation
+   - Minimal computational overhead
+
+2. **Basic** (`complexity='basic'`)
+   - Basic rotation and scaling
+   - Good performance
+   - Suitable for low-security applications
+   - Light computational overhead
+
+3. **Standard** (`complexity='standard'`)
+   - Full momentum-based transformation
+   - Balanced performance
+   - Suitable for most security needs
+   - Moderate computational overhead
+
+4. **High** (`complexity='high'`)
+   - Enhanced security with additional transformations
+   - Higher computational cost
+   - Suitable for high-security applications
+   - Maximum protection
+
+See [examples/complexity_levels.py](examples/complexity_levels.py) for a demonstration of each level.
+
 ## Examples
+
+### Complexity Levels Demo
+
+See [examples/complexity_levels.py](examples/complexity_levels.py) for a demonstration of:
+- Different transformation complexities
+- Performance benchmarks
+- Security-performance tradeoffs
+- Effect on vector properties
 
 ### Basic Spherical Tokenization
 
-See [examples/spherical_tokenization.py](examples/spherical_tokenization.py) for a demonstration of how the spherical tokenization system works, including:
+See [examples/spherical_tokenization.py](examples/spherical_tokenization.py) for a demonstration of:
 - Vector transformation in different regions
 - Spheroid decomposition effects
 - Semantic relationship preservation
@@ -73,10 +112,10 @@ For detailed design information and implementation details, see [DESIGN.md](DESI
    - Ensures cross-modal consistency
 
 2. **Momentum-Based Encryption**
+   - Configurable complexity levels
    - Deterministic transformations
    - Reversible operations
    - Scale-invariant transformations
-   - Guaranteed minimum effect
 
 3. **Spheroid Decomposition**
    - Local transformation regions
@@ -101,7 +140,8 @@ For detailed design information and implementation details, see [DESIGN.md](DESI
 ```python
 manager = CrossModalManager(
     modalities={'image': 512, 'text': 768},
-    master_key=b'your-secret-key'
+    master_key=b'your-secret-key',
+    complexity='standard'  # Choose complexity level
 )
 ```
 

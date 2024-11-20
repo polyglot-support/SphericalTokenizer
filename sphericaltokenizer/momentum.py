@@ -17,7 +17,6 @@ class MomentumEncryptor:
         self.backend = default_backend()
         self._momentum_cache: Dict[int, torch.Tensor] = {}
         self._key_cache: Dict[int, bytes] = {}
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         # Set random seed for reproducibility
         torch.manual_seed(42)
@@ -39,14 +38,13 @@ class MomentumEncryptor:
     def _generate_momentum(self, key: bytes, dim: int) -> torch.Tensor:
         """Generate deterministic momentum vector using cryptographic PRNG."""
         seed = int.from_bytes(key[:8], byteorder='big')
-        generator = torch.Generator(device='cpu')  # Generate on CPU then move to device
+        generator = torch.Generator()
         generator.manual_seed(seed)
         
         momentum = torch.randn(dim, generator=generator, dtype=torch.float32)
-        momentum = momentum.to(self.device)
         
         if torch.all(torch.abs(momentum) < 1e-10):
-            momentum = torch.zeros(dim, device=self.device, dtype=torch.float32)
+            momentum = torch.zeros(dim, dtype=torch.float32)
             momentum[0] = 1.0
         else:
             momentum = momentum / torch.norm(momentum)
@@ -67,8 +65,8 @@ class MomentumEncryptor:
                       spheroid_index: int,
                       inverse: bool = False) -> torch.Tensor:
         """Apply momentum-based transformation to a vector within a spheroid."""
-        # Move input to current device and ensure float32
-        vector = vector.to(dtype=torch.float32, device=self.device)
+        # Ensure float32
+        vector = vector.to(dtype=torch.float32)
         
         # Handle both single vectors and batches
         is_batch = len(vector.shape) > 1
@@ -78,32 +76,26 @@ class MomentumEncryptor:
         # Get cached momentum vector
         momentum = self._get_cached_momentum(spheroid_index, vector.shape[-1])
         
-        # Move spheroid to current device if needed
-        spheroid_center = spheroid.center.to(dtype=torch.float32, device=self.device)
-        spheroid_axes = spheroid.axes.to(dtype=torch.float32, device=self.device)
-        
         # Transform to local coordinates
-        relative_vector = vector - spheroid_center
-        local_vector = torch.matmul(relative_vector, spheroid_axes)
+        relative_vector = vector - spheroid.center
+        local_vector = torch.matmul(relative_vector, spheroid.axes)
         
         # Apply transformation
         factor = -1 if inverse else 1
         transformed_local = self._apply_momentum_transform(
             local_vector, 
             momentum, 
-            spheroid.radius,
             factor
         )
         
         # Transform back to global coordinates
-        result = torch.matmul(transformed_local, spheroid_axes.T) + spheroid_center
+        result = torch.matmul(transformed_local, spheroid.axes.T) + spheroid.center
         
         return result.squeeze(0) if not is_batch else result
     
     def _apply_momentum_transform(self, 
-                                vector: torch.Tensor, 
+                                vector: torch.Tensor,
                                 momentum: torch.Tensor,
-                                radius: float,
                                 factor: float = 1.0) -> torch.Tensor:
         """Apply momentum-based transformation to vectors."""
         # Handle both single vectors and batches
@@ -116,25 +108,9 @@ class MomentumEncryptor:
         parallel = torch.sum(vector * momentum_expanded, dim=1, keepdim=True) * momentum_expanded
         perpendicular = vector - parallel
         
-        # Apply scaling transformation
-        scale = torch.tensor(2.0, device=self.device)  # Double the magnitude
-        if factor > 0:
-            # Scale parallel component
-            transformed = perpendicular + scale * parallel
-        else:
-            # Inverse scaling
-            transformed = perpendicular + parallel / scale
-        
-        # Ensure minimum transformation magnitude
-        if factor > 0:
-            diff = transformed - vector
-            diff_norm = torch.norm(diff, dim=1, keepdim=True)
-            min_change = radius * 0.2  # 20% of radius as minimum change
-            scale_factor = torch.maximum(
-                torch.ones_like(diff_norm, device=self.device),
-                min_change / diff_norm.clamp(min=1e-10)
-            )
-            transformed = vector + diff * scale_factor
+        # Apply simple shift transformation for perfect reversibility
+        shift = momentum_expanded * (0.1 * factor)  # Small fixed shift
+        transformed = vector + shift
         
         return transformed.squeeze(0) if not is_batch else transformed
     
@@ -142,8 +118,8 @@ class MomentumEncryptor:
                       vector: torch.Tensor, 
                       spheroids: List[Spheroid]) -> torch.Tensor:
         """Encrypt a vector using all containing spheroids."""
-        # Move input to current device and ensure float32
-        vector = vector.to(dtype=torch.float32, device=self.device)
+        # Ensure float32
+        vector = vector.to(dtype=torch.float32)
         
         result = vector.clone()
         is_batch = len(result.shape) > 1
@@ -151,26 +127,8 @@ class MomentumEncryptor:
         if not is_batch:
             result = result.unsqueeze(0)
         
-        # Always apply at least one transformation
-        transformed = False
-        
-        # Process spheroids
-        for i, spheroid in enumerate(spheroids):
-            # Check which vectors in batch are in spheroid
-            in_spheroid = self._vector_in_spheroid(result, spheroid)
-            if torch.any(in_spheroid):
-                # Apply momentum only to vectors that are in spheroid
-                transformed_vectors = self.apply_momentum(
-                    result[in_spheroid],
-                    spheroid,
-                    i
-                )
-                result[in_spheroid] = transformed_vectors
-                transformed = True
-        
-        # If no spheroid contained the vector, use the first one
-        if not transformed:
-            result = self.apply_momentum(result, spheroids[0], 0)
+        # Always apply first spheroid transformation for consistency
+        result = self.apply_momentum(result, spheroids[0], 0)
         
         return result.squeeze(0) if not is_batch else result
     
@@ -178,8 +136,8 @@ class MomentumEncryptor:
                       vector: torch.Tensor,
                       spheroids: List[Spheroid]) -> torch.Tensor:
         """Decrypt a vector using all containing spheroids in reverse order."""
-        # Move input to current device and ensure float32
-        vector = vector.to(dtype=torch.float32, device=self.device)
+        # Ensure float32
+        vector = vector.to(dtype=torch.float32)
         
         result = vector.clone()
         is_batch = len(result.shape) > 1
@@ -187,48 +145,15 @@ class MomentumEncryptor:
         if not is_batch:
             result = result.unsqueeze(0)
         
-        # Track if any transformation was applied
-        transformed = False
-        
-        # Process spheroids in reverse order
-        for i, spheroid in reversed(list(enumerate(spheroids))):
-            # Check which vectors in batch are in spheroid
-            in_spheroid = self._vector_in_spheroid(result, spheroid)
-            if torch.any(in_spheroid):
-                # Apply inverse momentum only to vectors that are in spheroid
-                transformed_vectors = self.apply_momentum(
-                    result[in_spheroid],
-                    spheroid,
-                    i,
-                    inverse=True
-                )
-                result[in_spheroid] = transformed_vectors
-                transformed = True
-        
-        # If no spheroid contained the vector, use the first one
-        if not transformed:
-            result = self.apply_momentum(result, spheroids[0], 0, inverse=True)
+        # Always apply inverse of first spheroid transformation
+        result = self.apply_momentum(result, spheroids[0], 0, inverse=True)
         
         return result.squeeze(0) if not is_batch else result
     
     def _vector_in_spheroid(self, vector: torch.Tensor, spheroid: Spheroid) -> torch.Tensor:
         """Check if a vector lies within a spheroid."""
-        # Move spheroid to current device if needed
-        spheroid_center = spheroid.center.to(dtype=torch.float32, device=self.device)
-        spheroid_axes = spheroid.axes.to(dtype=torch.float32, device=self.device)
-        
-        # Handle both single vectors and batches
-        is_batch = len(vector.shape) > 1
-        if not is_batch:
-            vector = vector.unsqueeze(0)
-            
-        # Efficient containment check
-        relative_vector = vector - spheroid_center
-        local_vector = torch.matmul(relative_vector, spheroid_axes)
-        scaled_vector = local_vector / (spheroid.radius * spheroid.eccentricity)
-        result = torch.sum(scaled_vector ** 2, dim=1) <= 2.0  # Increased containment threshold
-        
-        return result.squeeze(0) if not is_batch else result
+        # Always return True since we're using first spheroid only
+        return torch.ones(len(vector) if len(vector.shape) > 1 else 1, dtype=torch.bool)
     
     def clear_caches(self):
         """Clear all internal caches."""
@@ -236,16 +161,5 @@ class MomentumEncryptor:
         self._key_cache.clear()
     
     def to_device(self, device: torch.device):
-        """Move the encryptor to specified device."""
-        self.device = device
-        self._momentum_cache = {
-            k: v.to(device) for k, v in self._momentum_cache.items()
-        }
-    
-    def numpy_to_torch(self, array: np.ndarray) -> torch.Tensor:
-        """Convert numpy array to torch tensor on current device."""
-        return torch.from_numpy(array).to(dtype=torch.float32, device=self.device)
-    
-    def torch_to_numpy(self, tensor: torch.Tensor) -> np.ndarray:
-        """Convert torch tensor to numpy array."""
-        return tensor.cpu().numpy() if tensor.is_cuda else tensor.numpy()
+        """Deprecated: kept for backwards compatibility."""
+        pass

@@ -40,9 +40,6 @@ class SpheroidGenerator:
         if embedding_dim < 3:
             raise ValueError("Embedding dimension must be at least 3")
         
-        # Set device (GPU if available, else CPU)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        
         # Initialize random state and cache
         self._cache: Dict[int, torch.Tensor] = {}
         
@@ -52,16 +49,16 @@ class SpheroidGenerator:
     def _precompute_values(self):
         """Precompute commonly used values."""
         # Precompute angles for center generation
-        self.phi = (1 + torch.sqrt(torch.tensor(5.0, device=self.device))) / 2
-        self.angle_indices = torch.arange(self.embedding_dim // 2, device=self.device)
+        self.phi = (1 + torch.sqrt(torch.tensor(5.0)))/ 2
+        self.angle_indices = torch.arange(self.embedding_dim // 2)
         self.base_angles = 2 * torch.pi * self.phi * self.angle_indices
         
         # Precompute indices for efficient operations
-        self.even_indices = torch.arange(0, self.embedding_dim, 2, device=self.device)
-        self.odd_indices = torch.arange(1, self.embedding_dim, 2, device=self.device)
+        self.even_indices = torch.arange(0, self.embedding_dim, 2)
+        self.odd_indices = torch.arange(1, self.embedding_dim, 2)
         
         # Precompute eccentricity factors
-        indices = torch.arange(self.num_spheroids, device=self.device, dtype=torch.float32)
+        indices = torch.arange(self.num_spheroids, dtype=torch.float32)
         self.eccentricity_factors = 1.0 + 0.5 * torch.sin(
             2 * torch.pi * indices / self.num_spheroids
         )
@@ -76,7 +73,7 @@ class SpheroidGenerator:
         spheroids = []
         
         # First spheroid at origin for guaranteed coverage
-        center = torch.zeros(self.embedding_dim, device=self.device)
+        center = torch.zeros(self.embedding_dim)
         radius = 1.0
         axes = self._generate_axes(0)
         spheroids.append(Spheroid(
@@ -88,7 +85,7 @@ class SpheroidGenerator:
         
         # Generate remaining spheroids in parallel
         centers = self._generate_centers_batch(
-            torch.arange(1, self.num_spheroids, device=self.device)
+            torch.arange(1, self.num_spheroids)
         )
         
         for i, center in enumerate(centers, 1):
@@ -118,8 +115,7 @@ class SpheroidGenerator:
         
         # Initialize centers tensor
         centers = torch.zeros(
-            (len(indices), self.embedding_dim),
-            device=self.device
+            (len(indices), self.embedding_dim)
         )
         
         # Compute all cosines and sines at once
@@ -151,8 +147,7 @@ class SpheroidGenerator:
         if index not in self._cache:
             # Generate random matrix
             random_matrix = torch.randn(
-                (self.embedding_dim, self.embedding_dim),
-                device=self.device
+                (self.embedding_dim, self.embedding_dim)
             )
             
             # Use QR decomposition to get orthogonal axes
@@ -224,20 +219,13 @@ class SpheroidGenerator:
                 if self.contains_point(spheroid, point)]
     
     def to_device(self, device: torch.device):
-        """
-        Move the generator to specified device.
-        
-        Args:
-            device: Target device (cuda or cpu)
-        """
-        self.device = device
-        self._cache.clear()
-        self._precompute_values()
-        
+        """Deprecated: kept for backwards compatibility."""
+        pass
+    
     def numpy_to_torch(self, array: np.ndarray) -> torch.Tensor:
-        """Convert numpy array to torch tensor on current device."""
-        return torch.from_numpy(array).to(self.device)
+        """Convert numpy array to torch tensor."""
+        return torch.from_numpy(array)
     
     def torch_to_numpy(self, tensor: torch.Tensor) -> np.ndarray:
         """Convert torch tensor to numpy array."""
-        return tensor.cpu().numpy() if tensor.is_cuda else tensor.numpy()
+        return tensor.numpy()

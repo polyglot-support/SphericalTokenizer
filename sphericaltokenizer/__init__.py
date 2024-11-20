@@ -1,7 +1,17 @@
-from .tokenizer import SphericalTokenizer
-from .spheroid import SpheroidGenerator
+from .cross_modal import CrossModalManager
+from .spheroid import Spheroid, SpheroidGenerator
 from .momentum import MomentumEncryptor
-from .layers import LayerManager
+from .layers import Layer, LayerManager
+from .tokenizer import SphericalTokenizer
 
-__version__ = "0.1.0"
-__all__ = ["SphericalTokenizer", "SpheroidGenerator", "MomentumEncryptor", "LayerManager"]
+__version__ = '0.1.0'
+
+__all__ = [
+    'CrossModalManager',
+    'Spheroid',
+    'SpheroidGenerator',
+    'MomentumEncryptor',
+    'Layer',
+    'LayerManager',
+    'SphericalTokenizer',
+]
