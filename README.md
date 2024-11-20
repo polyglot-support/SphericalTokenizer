@@ -1,150 +1,139 @@
 # SphericalTokenizer
 
-A GPU-accelerated cryptographic tokenizer library that secures embedding vectors through geometric transformations and role-based access control. SphericalTokenizer decomposes n-dimensional spaces into spheroids and applies momentum-based transformations to prevent unauthorized access patterns, including jailbreaks and prompt injection attacks in LLM systems.
+A secure tokenization system that uses spherical geometry and particle momentum simulation to create RBAC-secured transformations for embedding vectors. This system provides protection against jailbreaks and other attacks on LLM systems by creating secure, reversible transformations that maintain semantic relationships while preventing unauthorized access.
 
 ## Features
 
-- **GPU-Accelerated Geometric Encryption**: Decomposes n-dimensional embedding spaces into n/3 spheroids with CUDA support
-- **Efficient Batch Processing**: Optimized batch operations for high-performance vector transformations
-- **Momentum-Based Transformations**: Applies secure, reversible transformations using particle momentum
-- **Role-Based Access Control**: Layered security model for fine-grained access control
-- **Attack Prevention**: Protects against jailbreaks, prompt injection, and model extraction
-- **Automatic Device Management**: Seamless CPU fallback when GPU is unavailable
-
-## Performance
-
-- **Single Vector Operations**: ~100ms per vector
-- **Batch Processing**: ~43ms per vector with optimal batch size (32)
-- **Memory Usage**: ~1.7GB for standard operations
-- **GPU Utilization**: Efficient tensor operations with proper memory management
+- Spheroid-based decomposition of embedding space
+- Momentum-based encryption with guaranteed minimum transformation effect
+- Cross-modal security with consistency verification
+- Anomaly detection for embedding manipulation attempts
+- Device-independent operation (CPU/GPU support)
+- Batch processing support
+- Robust numerical stability
 
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+pip install sphericaltokenizer
 ```
-
-Required dependencies:
-- PyTorch >= 2.0.0 (with CUDA support for GPU acceleration)
-- NumPy >= 1.21.0
-- Cryptography >= 3.4.7
 
 ## Quick Start
 
 ```python
 import torch
-from sphericaltokenizer import SphericalTokenizer
+from sphericaltokenizer import CrossModalManager
 
-# Initialize tokenizer (automatically uses GPU if available)
-embedding_dim = 768  # Example dimension for BERT embeddings
-master_key = b'your-secure-key-here'
-tokenizer = SphericalTokenizer(embedding_dim, master_key)
+# Initialize the manager
+manager = CrossModalManager(
+    modalities={
+        'image': 512,
+        'text': 768
+    },
+    master_key=b'your-secure-key'
+)
 
-# Create roles with permissions
-tokenizer.create_role('admin', {'read', 'write', 'execute'})
-tokenizer.create_role('user', {'read'})
+# Transform embeddings
+embeddings = {
+    'image': image_embedding,  # Your image embedding tensor
+    'text': text_embedding     # Your text embedding tensor
+}
 
-# Example embedding vector (automatically moves to GPU if available)
-vector = torch.randn(embedding_dim)
-
-# Encrypt vector with role-based access
-encrypted = tokenizer.encrypt(vector, roles=['user'])
-
-# Decrypt vector with appropriate roles
-decrypted = tokenizer.decrypt(encrypted, roles=['user'])
-
-# Verify transformation
-assert tokenizer.verify_transformation(vector, roles=['user'])
+transformed = manager.secure_cross_modal_transform(embeddings)
 ```
 
-## Advanced Usage
+## Examples
 
-### Efficient Batch Processing
+### Basic Spherical Tokenization
+
+See [examples/spherical_tokenization.py](examples/spherical_tokenization.py) for a demonstration of how the spherical tokenization system works, including:
+- Vector transformation in different regions
+- Spheroid decomposition effects
+- Semantic relationship preservation
+- Transformation reversibility
+
+### Cross-Modal Security
+
+See [examples/cross_modal_security.py](examples/cross_modal_security.py) for an example of:
+- Cross-modal transformation security
+- Anomaly detection
+- Consistency verification
+- Device movement handling
+
+## Documentation
+
+For detailed design information and implementation details, see [DESIGN.md](DESIGN.md).
+
+### Key Components
+
+1. **CrossModalManager**: Main interface for secure transformations
+   - Manages modality-specific configurations
+   - Handles device movement
+   - Provides anomaly detection
+   - Ensures cross-modal consistency
+
+2. **Momentum-Based Encryption**
+   - Deterministic transformations
+   - Reversible operations
+   - Scale-invariant transformations
+   - Guaranteed minimum effect
+
+3. **Spheroid Decomposition**
+   - Local transformation regions
+   - Smooth transitions
+   - Configurable containment
+   - Device-independent operations
+
+## Security Features
+
+- Value range validation (-100 to 100)
+- Magnitude checks (1e-8 to 1e4)
+- NaN/Inf detection
+- Entropy-based anomaly detection
+- Reconstruction error validation
+- Transformation effect verification
+- Cross-modal consistency checks
+
+## Usage Guidelines
+
+### Initialization
 
 ```python
-# Process multiple vectors efficiently on GPU
-batch_size = 32  # Optimal batch size for GPU
-vectors = torch.randn(batch_size, embedding_dim)
-encrypted_batch = tokenizer.transform_batch(vectors, roles=['user'])
+manager = CrossModalManager(
+    modalities={'image': 512, 'text': 768},
+    master_key=b'your-secret-key'
+)
 ```
 
-### Secure Similarity Computation
+### Transformation
 
 ```python
-# Compare vectors in secure space with GPU acceleration
-vector1 = torch.randn(embedding_dim)
-vector2 = torch.randn(embedding_dim)
-similarity = tokenizer.secure_similarity(vector1, vector2, roles=['user'])
+transformed = manager.secure_cross_modal_transform({
+    'image': image_embedding,
+    'text': text_embedding
+})
 ```
 
-### Role-Based Access Control
+### Validation
 
 ```python
-# Create roles with specific permissions
-tokenizer.create_role('moderator', {'read', 'moderate'})
-
-# Validate access rights
-required_permissions = {'read', 'moderate'}
-has_access = tokenizer.validate_access(required_permissions, ['moderator'])
-
-# Get effective permissions
-effective_perms = tokenizer.get_effective_permissions(['admin', 'moderator'])
+anomalies = manager.detect_anomalies(embeddings)
+is_consistent = manager.verify_cross_modal_consistency(embeddings)
 ```
 
-## Performance Optimization
-
-### Batch Size Selection
-- Optimal batch size: 32 vectors
-- Adjust based on available GPU memory
-- Use smaller batches for CPU-only operation
+### Device Movement
 
 ```python
-# Example of batch size selection
-if torch.cuda.is_available():
-    batch_size = 32  # GPU optimal
-else:
-    batch_size = 16  # CPU optimal
+# Move to GPU
+manager.to(torch.device('cuda'))
 
-# Process in batches
-results = tokenizer.transform_batch(vectors, batch_size=batch_size)
+# Move back to CPU
+manager.to(torch.device('cpu'))
 ```
-
-### Memory Management
-
-```python
-# Clear GPU cache if needed
-torch.cuda.empty_cache()
-
-# Move tokenizer to specific device
-tokenizer.to(torch.device('cuda:1'))  # For multi-GPU systems
-```
-
-## Security Model
-
-SphericalTokenizer implements a multi-layered security approach:
-
-1. **Base Layer**: GPU-accelerated geometric decomposition into spheroids
-2. **Momentum Layer**: Cryptographic transformations using particle momentum
-3. **Role Layer**: RBAC-based access control
-4. **Composition Layer**: Secure layer composition and validation
-
-### Attack Prevention
-
-- **Jailbreak Prevention**: Geometric constraints prevent unauthorized command execution
-- **Prompt Injection**: Layered RBAC prevents unauthorized access patterns
-- **Model Extraction**: Encrypted embeddings resist reverse engineering attempts
-
-## Performance Benchmarks
-
-| Operation | GPU Time (ms) | CPU Time (ms) |
-|-----------|--------------|--------------|
-| Single Vector | 100 | 300 |
-| Batch (32) | 43 per vector | 250 per vector |
-| Similarity | 85 | 200 |
 
 ## Contributing
 
-Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) for details on how to submit pull requests, report issues, and contribute to the project.
+Contributions are welcome! Please read our contributing guidelines and submit pull requests.
 
 ## License
 
@@ -152,19 +141,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Citation
 
-If you use SphericalTokenizer in your research, please cite:
+If you use this in your research, please cite:
 
 ```bibtex
 @software{sphericaltokenizer2024,
   title={SphericalTokenizer: GPU-Accelerated Geometric Encryption for LLM Security},
   author={SphericalTokens Team},
-  year={2023},
+  year={2024},
   url={https://github.com/polyglot-support/sphericaltokenizer}
 }
-```
-
-## Acknowledgments
-
-- Built on PyTorch for GPU acceleration
-- Inspired by geometric approaches to cryptography
-- Developed with focus on LLM security requirements

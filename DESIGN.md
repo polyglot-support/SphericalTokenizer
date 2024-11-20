@@ -1,180 +1,130 @@
 # SphericalTokenizer Design Document
 
 ## Overview
-SphericalTokenizer is a GPU-accelerated cryptographic system designed to secure embedding vectors used in Large Language Models (LLMs) through geometric transformations and controlled randomization. The system provides Role-Based Access Control (RBAC) capabilities by layering encrypted embeddings, effectively preventing unauthorized access patterns including jailbreaks and prompt injection attacks.
 
-## Core Concepts
+SphericalTokenizer is a security-focused tokenization system that provides RBAC-secured transformations for embedding vectors. It uses a novel approach combining spherical geometry and particle momentum simulation to create secure, reversible transformations that are resistant to various attacks.
 
-### Spherical Decomposition
-The system decomposes n-dimensional embedding spaces into n/3 spheroids. Each spheroid represents a subspace of the original embedding, allowing for:
-- Geometric isolation of semantic components
-- Independent encryption of subspaces
-- Preservation of relative distances within subspaces
-- GPU-accelerated parallel processing of spheroids
+## Core Components
 
-### Particle Momentum Encryption
-At the center of each spheroid, a virtual particle is placed whose momentum is determined by a cryptographically secure PRNG. This provides:
-- Deterministic but secure transformation of vectors
-- Preservation of semantic relationships while obscuring raw values
-- Reversible encryption through inverse momentum application
-- Batch processing capabilities for efficient GPU utilization
+### 1. CrossModalManager
 
-### Layered RBAC
-The system implements security through sequential layering of encrypted embeddings:
-1. Base Layer: Core embedding vectors
-2. Role Layers: Role-specific transformations
-3. Access Layers: Context-dependent restrictions
+The central component that orchestrates secure transformations across different modalities:
+- Manages modality-specific configurations
+- Handles device movement (CPU/GPU)
+- Provides anomaly detection
+- Ensures cross-modal consistency
 
-## Mathematical Foundation
+### 2. Momentum-Based Encryption
 
-### Spheroid Generation
-For an n-dimensional embedding space E, we generate n/3 spheroids S_i where:
-- Each S_i is defined by center c_i and radius r_i
-- Spheroids are positioned to maximize coverage while minimizing overlap
-- Dimension reduction preserves semantic clustering
-- GPU-optimized matrix operations for efficient computation
+Uses particle momentum simulation for secure transformations:
+- Deterministic transformations based on cryptographic keys
+- Reversible operations for encryption/decryption
+- Scale-invariant transformations using relative metrics
+- Guaranteed minimum transformation effect
 
-### Momentum Application
-For each spheroid S_i:
-1. Generate seed k_i from master key K
-2. Initialize PRNG with k_i
-3. Generate momentum vector m_i
-4. Transform vectors within S_i according to m_i
-5. Utilize GPU parallelization for batch processing
+### 3. Spheroid Decomposition
 
-### Layer Composition
-Layers L_j are composed through:
-1. Sequential application of transformations T_j
-2. Preservation of inverse transformations T_j^(-1)
-3. Validation of composition properties
-4. Efficient GPU-based batch operations
+Decomposes n-dimensional space into overlapping spheroids:
+- Each spheroid defines a local transformation region
+- Smooth transitions between regions
+- Configurable containment thresholds
+- Device-independent operations
 
-## Performance Characteristics
+## Security Features
 
-### GPU Acceleration
-1. Batch Processing
-   - Optimal batch size: 32 vectors
-   - Memory-efficient tensor operations
-   - Automatic CPU fallback when GPU unavailable
+### 1. Validation Checks
 
-2. Memory Management
-   - Efficient tensor allocation
-   - Cached computations for repeated operations
-   - Proper device management for GPU memory
+Multiple layers of validation ensure embedding integrity:
+- Value range checks (-100 to 100)
+- Magnitude validation (1e-8 to 1e4)
+- NaN/Inf detection
+- Entropy-based anomaly detection
 
-3. Performance Metrics
-   - Single vector operations: ~100ms
-   - Batch processing: ~43ms per vector
-   - Memory footprint: ~1.7GB for standard operations
+### 2. Consistency Verification
 
-## Security Model
+Robust consistency checks for transformations:
+- Reconstruction error validation (relative tolerance)
+- Transformation effect verification (20% minimum change)
+- Deterministic transformation validation
+- Cross-modal consistency checks
 
-### Threat Analysis
-1. Jailbreak Attempts
-   - Prevented through geometric constraints
-   - Momentum-based transformations obscure attack vectors
+### 3. Anomaly Detection
 
-2. Prompt Injection
-   - Layered RBAC prevents unauthorized command execution
-   - Semantic boundaries enforced through spheroid isolation
+Multi-factor anomaly detection system:
+- Entropy-based analysis
+- Transformation consistency checks
+- Value range validation
+- Combined scoring with reduced sensitivity
 
-3. Model Extraction
-   - Encrypted embeddings resist reverse engineering
-   - Layered access prevents complete model reconstruction
+## Implementation Details
 
-### Security Properties
-1. Confidentiality
-   - Embedding values are encrypted
-   - Access patterns are obscured
+### 1. Device Handling
 
-2. Integrity
-   - Transformations are reversible
-   - Layer composition is verifiable
+Robust device management for GPU acceleration:
+- Automatic device detection
+- Consistent device state
+- Efficient cache management
+- Safe device transitions
 
-3. Authorization
-   - Role-based access control
-   - Context-aware restrictions
+### 2. Numerical Stability
 
-## Implementation Strategy
+Careful handling of numerical operations:
+- Relative error metrics
+- Minimum value clamping
+- Stable normalization
+- Configurable tolerances
 
-### Core Components
-1. SpheroidGenerator
-   - Computes optimal spheroid decomposition
-   - Manages spheroid metadata
-   - GPU-accelerated matrix operations
+### 3. Performance Optimization
 
-2. MomentumEncryptor
-   - Implements PRNG-based momentum
-   - Handles vector transformations
-   - Batch processing support
+Performance considerations:
+- Caching of derived values
+- Batch processing support
+- Efficient tensor operations
+- Memory-conscious design
 
-3. LayerManager
-   - Manages RBAC layers
-   - Coordinates transformations
-   - Efficient GPU memory usage
+## Usage Guidelines
 
-### Key Algorithms
-1. decompose_space(embedding_dim)
-   - Input: Dimension of embedding space
-   - Output: Set of spheroid definitions
-   - GPU optimization: Parallel matrix operations
+### 1. Initialization
 
-2. apply_momentum(vector, spheroid, key)
-   - Input: Vector/batch, spheroid context, encryption key
-   - Output: Transformed vector(s)
-   - GPU optimization: Batch matrix multiplication
-
-3. compose_layers(base_layer, role_layers)
-   - Input: Base and role-specific layers
-   - Output: Composed transformation
-   - GPU optimization: Parallel layer application
-
-## Usage Examples
-
-### Basic Encryption with GPU
 ```python
-# Initialize with GPU support
-tokenizer = SphericalTokenizer(dim=768, key="master_key")
-# Automatically uses GPU if available
-encrypted = tokenizer.encrypt(embedding)
-decrypted = tokenizer.decrypt(encrypted)
+manager = CrossModalManager(
+    modalities={'image': 512, 'text': 768},
+    master_key=b'your-secret-key'
+)
 ```
 
-### Batch Processing
+### 2. Transformation
+
 ```python
-# Process multiple vectors efficiently on GPU
-batch = torch.randn(32, 768)  # Optimal batch size
-encrypted_batch = tokenizer.transform_batch(batch)
-decrypted_batch = tokenizer.transform_batch(encrypted_batch, decrypt=True)
+transformed = manager.secure_cross_modal_transform({
+    'image': image_embedding,
+    'text': text_embedding
+})
 ```
 
-### RBAC Implementation
-```python
-# Define roles with GPU-accelerated transformations
-admin_layer = tokenizer.create_role("admin", {"read", "write"})
-user_layer = tokenizer.create_role("user", {"read"})
+### 3. Validation
 
-# Apply role-based encryption
-admin_view = tokenizer.apply_layer(encrypted, "admin")
-user_view = tokenizer.apply_layer(encrypted, "user")
+```python
+anomalies = manager.detect_anomalies(embeddings)
+is_consistent = manager.verify_cross_modal_consistency(embeddings)
 ```
 
-## Future Considerations
+## Security Considerations
 
-1. Performance Optimization
-   - Multi-GPU support
-   - Dynamic batch size adjustment
-   - Advanced memory management
-
-2. Extended Security Features
-   - Quantum-resistant variants
-   - Dynamic role adaptation
+1. The system provides security through:
+   - Cryptographic key derivation
+   - Multi-factor validation
+   - Transformation irreversibility
    - Anomaly detection
 
-3. Integration Capabilities
-   - Framework-specific adapters
-   - Cloud service compatibility
-   - Monitoring and logging
+2. Protected against:
+   - Jailbreak attempts
+   - Embedding manipulation
+   - Cross-modal attacks
+   - Numerical exploits
 
-## Conclusion
-SphericalTokenizer provides a robust foundation for securing LLM systems through GPU-accelerated geometric transformations and layered access control. The design prioritizes security while maintaining high performance through efficient GPU utilization, offering a practical solution for protecting sensitive AI systems.
+3. Limitations:
+   - Requires secure key management
+   - Performance overhead from validation
+   - Memory requirements for caching
+   - GPU dependency for optimal performance

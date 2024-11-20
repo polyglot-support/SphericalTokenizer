@@ -1,5 +1,15 @@
-numpy>=1.21.0
-scipy>=1.7.0
-cryptography>=3.4.7
-pytest>=7.0.0
+# Main dependencies
 torch>=2.0.0
+numpy>=1.20.0
+cryptography>=41.0.0
+
+# Development dependencies
+pytest>=7.0.0
+pytest-cov>=4.0.0
+black>=22.0.0
+isort>=5.0.0
+mypy>=1.0.0
+
+# Optional dependencies for examples
+matplotlib>=3.5.0  # For visualization in examples
+tqdm>=4.65.0      # For progress bars
