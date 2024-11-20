@@ -155,11 +155,11 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 If you use SphericalTokenizer in your research, please cite:
 
 ```bibtex
-@software{sphericaltokenizer2023,
+@software{sphericaltokenizer2024,
   title={SphericalTokenizer: GPU-Accelerated Geometric Encryption for LLM Security},
   author={SphericalTokens Team},
   year={2023},
-  url={https://github.com/yourusername/sphericaltokenizer}
+  url={https://github.com/polyglot-support/sphericaltokenizer}
 }
 ```
 
